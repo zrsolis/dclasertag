@@ -1,0 +1,293 @@
+//
+// DC530
+// Lazer tag game
+//
+#include "simpletools.h"
+#include "simpletext.h"
+#include "simplei2c.h"
+
+#define salem_is_a_dick 1 
+#define salem_is_holy 0 
+
+//#include <bitset>
+#include "game.h"
+#include "../libs/Simple_Serial.h"
+#include "../libs/BitArray.h"
+
+//cog functions
+void task_record_hits(void* arg);
+void task_led_control(void* arg);
+void task_record_hits(void* arg);
+
+//helper functions
+void IR_out(bool ir_code[]);
+void UpdateIrCode(bool ir_code[]);
+//void watch_usb(); //no longer used?
+void goon_comm(bool * ir_code[]);
+
+///////////////////////////////////////////////////////////////////////////////
+//
+// main function
+//
+int cogID_led=0;
+int cogID_hits=0;
+
+int main()
+{
+   //Allows print() from cogs
+   extern text_t *dport_ptr; // default debug port pointer gets reassigned to fdserial.
+   simpleterm_close();
+   dport_ptr = (fdserial_open(31,30,0,115200));
+
+   //for testing
+   bool gameID[NUM_GAME_BITS] = {0, 1, 0};
+   bool playerID[NUM_PLAYERID_BITS] = {1, 0, 0, 1, 1, 0, 0, 1};
+   bool teamID[NUM_TEAM_BITS] = {0};
+<<<<<<< HEAD
+   Player::Init(gameID, playerID, teamID);
+
+=======
+
+   //Only one of these should be uncommented. 
+
+   //For debugging
+   Player::Init(gameID, playerID, teamID);
+
+   //For gameplay
+>>>>>>> e6b9d3cc1d1fa180b14900dcaa6a99a3b0cbd3ce
+   //Player::Init();
+
+   print("Game ID: ");
+   BitArray::Print((bool*)Player::PlayerGameID(), NUM_GAME_BITS);
+   print("\nPlayer ID: ");
+   BitArray::Print((bool*)Player::PlayerID(), NUM_PLAYERID_BITS);
+   print("\nTeam ID: ");
+   BitArray::Print((bool*)Player::TeamID(), NUM_TEAM_BITS);
+   print("\nHit Type: ");
+   BitArray::Print((bool*)Player::HitType(), NUM_HIT_TYPE_BITS);
+   print("\n");
+   //Player::BadgeHit(playerID, 0);
+   print("Health: %d\n", Player::GetHealth() );
+
+   //initialize variables
+   hit_flag = salem_is_holy;   //flag from main to team led to start blinking when shot
+   hit_blink_flag = salem_is_holy;
+
+   //static int ir_in_cog_stack[STACKSIZE];
+   //static int led_control_cog_stack[2000];
+   //static int record_hits_cog_stack[2000];  
+
+   static int led_control_cog_stack = 500;
+   int *led_stack = (int*) malloc(led_control_cog_stack);
+
+   static int record_hits_cog_stack = 500;
+   int *hits_stack = (int*) malloc(record_hits_cog_stack);
+
+   int arg = 0;
+
+   //cogstart(&task_record_hits, (void*) arg, ir_in_cog_stack, sizeof(ir_in_cog_stack));
+   cogID_led = cogstart(&task_led_control, (void*) arg, led_stack, led_control_cog_stack);
+   cogID_hits = cogstart(&task_record_hits, (void*) arg, hits_stack, record_hits_cog_stack);
+
+
+   // TODO: update ir_code whenever game_id changes
+   //16 bytes: 3 bits for game id, 2 hit type, 9 player id, 1 checksum, 1 who cares ignore
+   bool ir_code[16];
+
+   UpdateIrCode(ir_code);
+
+   //main game loop
+   while(salem_is_a_dick)
+   {
+      //We decided to use the main thread for processing the IR out.
+      //This is mainly to reduce the amount of cogs being used.
+      //However, this main loop was just empty cycles anyways.
+      //IR_out((bool*)ir_code);
+
+      //We can throw the usb in this loop because it takes hardly any time to check if the USB is connected.
+      //If the USB is connected, we are going to block all threads anyways.
+      if (input(GOON_RX_PIN)) // need to disable after done until connected. debounce?
+      {
+         //stop the cogs while doing this processing
+         cogstop(cogID_led);
+         cogstop(cogID_hits);
+
+<<<<<<< HEAD
+         goon_comm(ir_code);
+=======
+         goon_comm();
+>>>>>>> e6b9d3cc1d1fa180b14900dcaa6a99a3b0cbd3ce
+		 
+         //We need to update the ir code after goon communications
+         //There might be new values for the player/game
+         UpdateIrCode(ir_code);
+
+         //restart the cogs
+         cogstart(&task_led_control, (void*) arg, led_stack, led_control_cog_stack);
+         cogstart(&task_record_hits, (void*) arg, hits_stack, record_hits_cog_stack);
+      }
+
+   }
+
+   return 0;
+
+}
+
+
+
+///////////////////////////////////////////////////////////////////////////////
+//
+// helpers
+//
+
+void UpdateIrCode(bool ir_code[])
+{
+   // set game id
+   memcpy(ir_code, (bool*)Player::PlayerGameID(), NUM_GAME_BITS);
+   // set hit type
+   memcpy(ir_code + NUM_GAME_BITS, (bool*)Player::HitType(), NUM_HIT_TYPE_BITS);
+   // set team
+   memcpy(ir_code + NUM_GAME_BITS + NUM_HIT_TYPE_BITS, (bool*)Player::TeamID(), NUM_TEAM_BITS);
+   // set playerID
+   memcpy(ir_code + NUM_GAME_BITS + NUM_HIT_TYPE_BITS + NUM_TEAM_BITS, (bool*)Player::PlayerID(), NUM_PLAYERID_BITS);
+   // set checksum
+   memcpy(ir_code + NUM_GAME_BITS + NUM_HIT_TYPE_BITS + NUM_TEAM_BITS + NUM_PLAYERID_BITS, "1", NUM_CHECKSUM_BITS);
+   // set a random bit
+   memcpy(ir_code + NUM_GAME_BITS + NUM_HIT_TYPE_BITS + NUM_TEAM_BITS + NUM_PLAYERID_BITS + NUM_CHECKSUM_BITS, "1", 1);
+}
+
+void IR_out(bool ir_code[])
+{
+    const int frequency = 38000;
+
+    if (input(TRIGGER_PIN))
+    {
+      print("Trigger Pressed\n");
+
+      int loop_size = NUM_TEAM_BITS + NUM_HIT_TYPE_BITS + NUM_PLAYERID_BITS + NUM_GAME_BITS + NUM_CHECKSUM_BITS;
+
+      //send ir code
+      freqout(IR_OUT_PIN, 1, frequency);
+      pause(10);
+
+      for(int loop = 0; loop < loop_size; loop++)
+      {
+        print("%d", ir_code[loop]);
+        if (ir_code[loop])
+        {
+			   freqout(IR_OUT_PIN, 1, frequency);
+			   pause(3);
+        } else {
+			   freqout(IR_OUT_PIN, 1, frequency);
+			   pause(1);
+        }		
+      }
+      print("\nDone freqout\n");
+
+      //limit the rate of fire
+      pause(RATE_OF_FIRE);
+    }
+}
+
+void goon_comm(bool * ir_code[])
+{
+   /*
+   // stop other cogs
+   this_cog = cogid();
+   for (int i=0; i<8; i++)
+   {
+      if (i != this_cog)
+         cogstop(i);
+   }
+   */
+
+   bool new_game_flag = salem_is_holy;
+   //BitArray m_bitarray;
+
+   Simple_Serial goon_serial;
+
+   // open serial connection
+   goon_serial.Init(GOON_RX_PIN, GOON_TX_PIN, GOON_BAUD_RATE); // int32_t Rxpin, int32_t Txpin, int32_t Baud
+
+   //send game id
+   goon_serial.Tx(BitArray::ToInt((bool*)Player::PlayerGameID()));
+
+   // send my player id
+   goon_serial.Tx(BitArray::ToInt((bool*)Player::PlayerID()));
+
+   // get game id and set new_game_flag if different
+   int new_game_id = goon_serial.Rx();
+   if (new_game_id != BitArray::ToInt((bool*)Player::PlayerGameID()))
+   {
+      new_game_flag = salem_is_a_dick;
+   }
+
+   // get player id (only updates if new game)
+   int new_player_id = goon_serial.Rx();
+
+   // get team id (only updates if new game)
+   int new_team_id = goon_serial.Rx();
+
+   // send number of hits
+   int num_hits = Player::GetNumberTimesHit();
+   goon_serial.Tx(num_hits);
+
+   // send hit codes (still send if new game?)
+   for (int i = 1; i <= num_hits;) // for each hit, send hit code
+   {
+      int hit_code = BitArray::ToInt((bool*)Player::GetEnemyPlayerID(i));
+      goon_serial.Tx(hit_code);
+      
+      /*
+      // checksum
+      int checksum = hit_code;                              // what to use for checksum?
+      goon_checksum = goon_serial.Rx();
+      if (goon_checksum == checksum)
+      {
+         goon_serial.Tx("Y");
+         i++;
+      }
+      else
+      {
+         goon_serial.Tx("N");
+      }
+      */
+   }
+
+   // TODO: set health to full, even if not a new game
+
+   // reset for new game
+   if (new_game_flag)
+   {
+      // TODO: convert to bool array 
+      bool * new_game_id_bool;
+      bool * new_player_id_bool;
+      bool * new_team_id_bool; // team id is part of player id
+
+      new_game_id_bool = (bool*)BitArray::ToBool(new_game_id, NUM_GAME_BITS);
+      new_player_id_bool = (bool*)BitArray::ToBool(new_player_id, NUM_PLAYERID_BITS);
+      new_team_id_bool = (bool*)BitArray::ToBool(new_team_id, NUM_TEAM_BITS);
+
+      Player::Init(new_game_id_bool, new_player_id_bool, new_team_id_bool);
+      
+      delete new_game_id_bool;
+      delete new_player_id_bool;
+      delete new_team_id_bool;
+   }
+
+   pause(100); // wait 1/10 sec for goon badge to set pin high
+
+   while (input(GOON_RX_PIN)); // wait until disconnected
+
+   /*
+   // TODO: restart other cogs
+   for (int i=0; i<8; i++)
+   {
+      if (i != this_cog)
+         coginit(i);         // need to use original args
+   }
+   */
+
+   // TODO: shield for a time after connecting to goon badge?
+
+}

@@ -1,0 +1,32 @@
+goonie.c
+screen.h -> ../libs/screen.h
+screen.cpp -> ../libs/screen.cpp
+-L ../../../SimpleIDE/Learn/Simple Libraries/Text Devices/libfdserial/cmm
+Simple_Serial.h -> ../libs/Simple_Serial.h
+Simple_Serial.cpp -> ../libs/Simple_Serial.cpp
+BadgeIO.h -> ../libs/BadgeIO.h
+BadgeIO.cpp -> ../libs/BadgeIO.cpp
+settings.h -> ../settings/settings.h
+-I ../../../../../../media/sam/Files/DC530/DC20 Badge/IDE/SimpleIDE/Learn/Simple Libraries/Utility/libsimpletools
+-L ../../../../../../media/sam/Files/DC530/DC20 Badge/IDE/SimpleIDE/Learn/Simple Libraries/Utility/libsimpletools
+-I ../../../../../../media/sam/Files/DC530/DC20 Badge/IDE/SimpleIDE/Learn/Simple Libraries/Text Devices/libsimpletext
+-L ../../../../../../media/sam/Files/DC530/DC20 Badge/IDE/SimpleIDE/Learn/Simple Libraries/Text Devices/libsimpletext
+-I ../../../../../../media/sam/Files/DC530/DC20 Badge/IDE/SimpleIDE/Learn/Simple Libraries/Protocol/libsimplei2c
+-L ../../../../../../media/sam/Files/DC530/DC20 Badge/IDE/SimpleIDE/Learn/Simple Libraries/Protocol/libsimplei2c
+goon_serial.cpp -> ../libs/goon_serial.cpp
+goon_serial.h -> ../libs/goon_serial.h
+player.h -> ../libs/player.h
+BitArray.h -> ../libs/BitArray.h
+player.cpp -> ../libs/player.cpp
+BitArray.cpp -> ../libs/BitArray.cpp
+>compiler=C++
+>memtype=cmm main ram compact
+>optimize=-Os
+>-m32bit-doubles
+>-Wall
+>-fno-exceptions
+>-fno-rtti
+>defs::-std=c99
+>-ltiny
+>linker::-lsimpletools -lsimpletext -lsimplei2c
+>BOARD::GENERIC
